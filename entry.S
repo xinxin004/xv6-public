@@ -22,6 +22,12 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "param.h"
+# ============================================
+# 内核入口点 (Kernel Entry Point)
+# 从这里开始执行内核代码
+# 虚拟地址：0x80100000 (entry)
+# 物理地址：0x00100000
+# ============================================
 
 # Multiboot header.  Data to direct multiboot loader.
 .p2align 2
@@ -43,19 +49,29 @@ _start = V2P_WO(entry)
 # Entering xv6 on boot processor, with paging off.
 .globl entry
 entry:
-  # Turn on page size extension for 4Mbyte pages
+  # ---------------------------------------------------
+  # 阶段1：设置初始页表
+  # 建立虚拟地址到物理地址的映射关系
+  # ---------------------------------------------------
+  # 加载页目录地址到CR3寄存器  # Turn on page size extension for 4Mbyte pages
   movl    %cr4, %eax
   orl     $(CR4_PSE), %eax
   movl    %eax, %cr4
   # Set page directory
   movl    $(V2P_WO(entrypgdir)), %eax
   movl    %eax, %cr3
-  # Turn on paging.
+  # ---------------------------------------------------
+  # 阶段2：启用分页机制
+  # 设置CR0寄存器的PG位和WP位
+  # ---------------------------------------------------  # Turn on paging.
   movl    %cr0, %eax
   orl     $(CR0_PG|CR0_WP), %eax
   movl    %eax, %cr0
 
-  # Set up the stack pointer.
+  # Set up the stack pointer.  # ---------------------------------------------------
+  # 阶段2：启用分页机制
+  # 设置CR0寄存器的PG位和WP位
+  # ---------------------------------------------------
   movl $(stack + KSTACKSIZE), %esp
 
   # Jump to main(), and switch to executing at

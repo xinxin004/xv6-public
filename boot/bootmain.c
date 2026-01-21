@@ -11,7 +11,10 @@
 #include "memlayout.h"
 
 #define SECTSIZE  512
-
+// ============================================
+// 引导加载程序主函数
+// 任务：从磁盘加载ELF格式的内核镜像到内存
+// ============================================
 void readseg(uchar*, uint, uint);
 
 void
@@ -21,16 +24,27 @@ bootmain(void)
   struct proghdr *ph, *eph;
   void (*entry)(void);
   uchar* pa;
-
+  // ---------------------------------------------------
+  // 阶段1：从磁盘读取ELF头部
+  // ELF头部位于磁盘的第一个扇区（512字节）
+  // 读取到内存地址0x10000处
+  // ---------------------------------------------------
   elf = (struct elfhdr*)0x10000;  // scratch space
 
   // Read 1st page off disk
   readseg((uchar*)elf, 4096, 0);
-
+  // ---------------------------------------------------
+  // 阶段2：验证ELF魔数
+  // 检查是否为有效的ELF文件（魔数：0x7F + "ELF"）
+  // ---------------------------------------------------
   // Is this an ELF executable?
   if(elf->magic != ELF_MAGIC)
     return;  // let bootasm.S handle error
-
+  // ---------------------------------------------------
+  // 阶段3：加载程序段
+  // 根据ELF头中的程序头表，加载每个段到指定内存位置
+  // ---------------------------------------------------
+  // ph指向第一个程序头表项
   // Load each program segment (ignores ph flags).
   ph = (struct proghdr*)((uchar*)elf + elf->phoff);
   eph = ph + elf->phnum;
@@ -40,13 +54,21 @@ bootmain(void)
     if(ph->memsz > ph->filesz)
       stosb(pa + ph->filesz, 0, ph->memsz - ph->filesz);
   }
-
+  // ---------------------------------------------------
+  // 阶段4：跳转到内核入口点
+  // ELF头部中的entry字段指定了入口地址
+  // ---------------------------------------------------
+  // 获取内核入口函数地址
   // Call the entry point from the ELF header.
   // Does not return!
   entry = (void(*)(void))(elf->entry);
   entry();
 }
+// ============================================
+// 辅助函数
+// ============================================
 
+// 等待磁盘控制器就绪
 void
 waitdisk(void)
 {

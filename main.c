@@ -17,7 +17,15 @@ extern char end[]; // first address after kernel loaded from ELF file
 int
 main(void)
 {
-  kinit1(end, P2V(4*1024*1024)); // phys page allocator
+  k  // 任务3：打印内核 main 函数启动
+  cprintf("\n[KERNEL] main() started\n");
+  cprintf("[KERNEL] xv6 kernel is booting...\n");
+  
+  // 原有的初始化代码
+  mpinit();        // 检测其他处理器
+  lapicinit();     // 初始化本地APIC
+  cprintf("\ncpu%d: starting %d\n", cpuid(), cpuid());
+  init3(end, P2V(4*1024*1024)); // phys page allocator
   kvmalloc();      // kernel page table
   mpinit();        // detect other processors
   lapicinit();     // interrupt controller
