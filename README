@@ -1,51 +1,59 @@
-NOTE: we have stopped maintaining the x86 version of xv6, and switched
-our efforts to the RISC-V version
-(https://github.com/mit-pdos/xv6-riscv.git)
+一、实验内容说明
+本次实验完成了以下任务：
+第一层：
+任务	状态	说明
+任务1：系统调用路径跟踪	 完成	跟踪 write 系统调用，在用户态、syscall入口、内核实现处添加打印
+任务2：调度过程观察	 完成	在 scheduler() 中添加日志，观察进程切换
+任务3：内存分配观察	 完成	在 kalloc() 中记录页分配情况
+第二层：
+任务	状态	说明
+任务2：系统调用行为修改	 完成	修改 sys_write()，每次调用时打印当前进程PID
 
-xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
-Version 6 (v6).  xv6 loosely follows the structure and style of v6,
-but is implemented for a modern x86-based multiprocessor using ANSI C.
+二、实现过程
+选做任务2：修改 write 系统调用行为
+1. 实现思路
+在 sysfile.c 中的 sys_write() 函数开头添加打印语句，输出当前进程的 PID：
+int sys_write(void)
+{
+    cprintf("[PID=%d] write syscall called\n", myproc()->pid);
+    // ... 原有代码保持不变
+}
+2 修改的文件
+文件	修改内容
+sysfile.c	在 sys_write() 中添加 cprintf 打印 PID
+syscall.c	添加系统调用入口打印（任务1）
+proc.c	添加调度器打印（任务2）
+kalloc.c	添加内存分配打印（任务3）
+3. 结果分析
+每个字符的输出都触发一次 write 系统调用
+PID=3 表示 echo 命令是 shell (PID=2) 创建的子进程
+[KERNEL] sys_write invoked! 证明系统调用成功进入内核
 
-ACKNOWLEDGMENTS
+三、遇到的问题及解决方法
+问题1：内核代码中使用 cprintf 时编译报“undefined reference”
+现象：在 sys_write() 或 scheduler() 中添加 cprintf 后，make 提示链接错误，找不到 cprintf 的实现。
+原因分析：cprintf 是内核态打印函数，声明在 defs.h 中，而修改的源文件未包含该头文件，导致编译器认为函数未定义。
+解决方法：在每个使用 cprintf 的 .c 文件开头增加 #include "defs.h"。例如在 sysfile.c、proc.c、kalloc.c 中均需添加。
 
-xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
-to Peer Communications; ISBN: 1-57398-013-7; 1st edition (June 14,
-2000)). See also https://pdos.csail.mit.edu/6.828/, which
-provides pointers to on-line resources for v6.
+问题2：误删 usys.S 文件导致系统调用无法编译
+现象：编译时提示 usys.S: No such file or directory，且所有用户程序链接失败。
+原因分析：之前为了清理临时文件或误操作删除了 usys.S，该文件包含了用户态系统调用跳板的汇编代码，必须存在。
+解决方法：使用 git checkout usys.S 从仓库中恢复该文件。如果没有 git 历史，可以从 xv6 官方源码包中重新复制。
 
-xv6 borrows code from the following sources:
-    JOS (asm.h, elf.h, mmu.h, bootasm.S, ide.c, console.c, and others)
-    Plan 9 (entryother.S, mp.h, mp.c, lapic.c)
-    FreeBSD (ioapic.c)
-    NetBSD (console.c)
+问题3：Makefile 中残留 _hello 条目导致链接错误
+现象：执行 make 时提示 undefined reference to 'hello' 或 _hello 相关错误。
+原因分析：之前尝试添加自定义系统调用 hello()，在 Makefile 的 UPROGS 中添加了 _hello，但后来删除了该用户程序源码，导致链接器找不到目标文件。
+解决方法：编辑 Makefile，找到 UPROGS 列表，删除 _hello 这一行，保存后重新编译。
 
-The following people have made contributions: Russ Cox (context switching,
-locking), Cliff Frey (MP), Xiao Yu (MP), Nickolai Zeldovich, and Austin
-Clements.
+问题4：调度日志刷屏，影响终端交互
+现象：在 scheduler() 中添加 cprintf 后，每切换一次进程就输出一行日志，大量输出导致提示符被频繁滚动，看起来像是“淹没了”。
+原因分析：xv6 内核本身会高频调度（时钟中断触发），即使是空闲进程也会不断切换，因此日志量巨大。
+解决方法：这并非错误，而是观察调度的正常现象。用户仍可在 $ 提示符后盲打命令，输出会自动滚动。如果确实觉得干扰，可以暂时注释掉调度打印，或者仅在调试时启用。
 
-We are also grateful for the bug reports and patches contributed by Silas
-Boyd-Wickizer, Anton Burtsev, Cody Cutler, Mike CAT, Tej Chajed, eyalz800,
-Nelson Elhage, Saar Ettinger, Alice Ferrazzi, Nathaniel Filardo, Peter
-Froehlich, Yakir Goaron,Shivam Handa, Bryan Henry, Jim Huang, Alexander
-Kapshuk, Anders Kaseorg, kehao95, Wolfgang Keller, Eddie Kohler, Austin
-Liew, Imbar Marinescu, Yandong Mao, Matan Shabtay, Hitoshi Mitake, Carmi
-Merimovich, Mark Morrissey, mtasm, Joel Nider, Greg Price, Ayan Shafqat,
-Eldar Sehayek, Yongming Shen, Cam Tenny, tyfkda, Rafael Ubal, Warren
-Toomey, Stephen Tu, Pablo Ventura, Xi Wang, Keiichi Watanabe, Nicolas
-Wolovick, wxdao, Grant Wu, Jindong Zhang, Icenowy Zheng, and Zou Chang Wei.
+四、实践心得
+这次 xv6 操作系统实践让我从“使用者”转变为“观察者”，真正走进了内核的内部世界。以前学习操作系统时，系统调用、进程调度、内存管理这些概念只是书上的文字和框图，我知道它们存在，却不知道它们是如何一环扣一环地运作的。通过亲手在关键路径上添加日志、修改行为、重新编译运行，我清晰地看到了数据流和控制权的转移。
+最让我震撼的是系统调用的完整路径：当我在终端按下 echo hello 回车的那一刻，用户程序调用 write(1, "hello\n", 6)，通过 usys.S 中的 int 指令陷入内核，syscall.c 根据系统调用号分发到 sys_write()，然后辗转调用 consolewrite() 将字符输出到屏幕。每一步都有明确的代码对应，每个函数的参数传递和返回值都清晰可见。这种感觉就像是原本蒙在鼓里的谜题被一层层揭开。
+调度日志让我亲眼验证了“并发”的实质——并不是真正的同时运行，而是 CPU 在进程之间快速切换。PID=1 的 init、PID=2 的 sh、PID=3 的 echo 交替出现在日志中，每次切换都伴随着寄存器的保存和恢复。内存分配日志则展示了内核如何管理稀缺的物理内存：地址连续分配但不一定连续复用，kfree 后的页面会重新出现在空闲链表头部。
+修改系统调用行为虽然只是加了一行打印，但它教会了我一个重要的调试方法：在关键路径上埋下“探针”，观察运行时的状态（比如 PID），从而理解内核的执行流。这种方法在今后的操作系统开发和性能分析中都会非常有用。
+总的来说，这次实践让我对操作系统的信任感和掌控感大大增强。我知道 every line of code has its purpose，也明白了为什么内核需要小心地处理同步、避免死锁。后续我希望继续挑战生产者-消费者模型，尝试用自旋锁和 sleep/wakeup 实现真实的同步场景。
 
-The code in the files that constitute xv6 is
-Copyright 2006-2018 Frans Kaashoek, Robert Morris, and Russ Cox.
-
-ERROR REPORTS
-
-We don't process error reports (see note on top of this file).
-
-BUILDING AND RUNNING XV6
-
-To build xv6 on an x86 ELF machine (like Linux or FreeBSD), run
-"make". On non-x86 or non-ELF machines (like OS X, even on x86), you
-will need to install a cross-compiler gcc suite capable of producing
-x86 ELF binaries (see https://pdos.csail.mit.edu/6.828/).
-Then run "make TOOLPREFIX=i386-jos-elf-". Now install the QEMU PC
-simulator and run "make qemu".
